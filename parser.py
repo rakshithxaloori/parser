@@ -16,9 +16,11 @@ V -> "smiled" | "tell" | "were"
 """
 
 NONTERMINALS = """
-S -> S CP | NP VP
-NP -> N | DP NP | NP PP
-VP -> V | V PP | V NP | Adv VP | V PP Adv
+S -> S CP | NPPP VPPP
+NPPP -> NP | NP PP
+VPPP -> VP | VP PP | VP PP Adv
+NP -> N | DP NP
+VP -> V | V NPPP | Adv VP | V Adv
 DP -> Det | Det AP
 AP -> Adj | Adj AP
 PP -> P NP | P S
@@ -88,7 +90,40 @@ def np_chunk(tree):
     whose label is "NP" that does not itself contain any other
     noun phrases as subtrees.
     """
-    return list()
+    # If an NP tree has N or DP NP as children, it is the smallest noun phrase
+    noun_phrases = list()
+    for s in tree.subtrees(lambda t: t.label() == 'NP'):
+        # s.label() == 'NP'. (child of s) .label() == 'NP' and (child (child of s)) .label() == 'N'
+        try:
+            if s[0].label() == 'N':
+                noun_phrases.append(s)
+            elif s[0].label() == 'DP':
+                if s[1].label() == 'NP':
+                    noun_phrases.append(s)
+        except IndexError:
+            pass
+
+    return remove_duplicates(noun_phrases)
+
+
+def remove_duplicates(noun_phrases):
+    """ Removes the smaller noun phrase tree if a super-tree contains this. """
+    remove_trees = list()
+    for noun_tree_1 in noun_phrases:
+        for noun_tree_2 in noun_phrases:
+            if noun_tree_1 == noun_tree_2:
+                continue
+            # If noun_tree_1 contains noun_tree_2, remove noun_tree_2
+            if noun_tree_2 in noun_tree_1.subtrees(lambda t: t.label() == noun_tree_2.label()):
+                remove_trees.append(noun_tree_2)
+
+    for remove_tree in remove_trees:
+        try:
+            noun_phrases.remove(remove_tree)
+        except ValueError:
+            pass
+
+    return noun_phrases
 
 
 if __name__ == "__main__":
